@@ -1,4 +1,2 @@
-colorama
 telethon==1.40.0
-asyncio
-telegram
+colorama
