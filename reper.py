@@ -9,8 +9,8 @@ from colorama import Fore, init
 init(autoreset=True)
 
 # --- CONFIGURATION ---
-API_ID = 6432372  # Aap apna API ID yahan badal sakte hain
-API_HASH = 'b182390150971c521783f46a7544a658'
+API_ID = 20106942  # Aap apna API ID yahan badal sakte hain
+API_HASH = '3bfe2013e4399af96d78640db6dcd601'
 SESSION_DIR = 'sessions'
 
 if not os.path.exists(SESSION_DIR):
