@@ -65,10 +65,9 @@ def generate_legal_report(mode, entity_name, bio_content, links):
 # --- CORE LOGIC FUNCTIONS ---
 
 async def collect_target_intel(client, target):
-    bio = ""
-    links = []
-    entity = await client.get_entity(target)
+    bio, links = "", []
     try:
+        entity = await client.get_entity(target)
         if isinstance(entity, (types.User, types.Bot)):
             full = await client(GetFullUserRequest(id=entity.id))
             bio = full.full_user.about or ""
@@ -76,77 +75,37 @@ async def collect_target_intel(client, target):
             full = await client(GetFullChannelRequest(channel=entity.id))
             bio = full.full_chat.about or ""
         links = re.findall(r'(https?://[^\s]+)', bio)
-    except Exception:
-        pass
-    return entity, bio, links
+        return entity, bio, links
+    except:
+        return None, "", []
 
-async def join_if_private(client, target):
-    if "t.me/+" in target or "t.me/joinchat/" in target:
-        hash_code = target.split('/')[-1].replace('+', '')
-        try:
-            await client(ImportChatInviteRequest(hash_code))
-            print(f"{Fore.GREEN}[+] Successfully accessed private entity.")
-            await asyncio.sleep(5)
-        except errors.UserAlreadyParticipantError:
-            pass
-        except Exception as e:
-            print(f"{Fore.RED}[!] Could not join: {e}")
-
-async def run_termination_sequence(session_name, target, count, mode):
+async def single_sync_report(session_name, target, selected_reason, legal_msg, msg_ids):
+    """TURBO MODE: Fast reporting logic"""
     client = TelegramClient(os.path.join(SESSION_DIR, session_name), API_ID, API_HASH)
     try:
         await client.connect()
         if not await client.is_user_authorized():
-            print(f"{Fore.RED}[!] Session {session_name} invalid. Skipping.")
-            return
+            return f"{Fore.RED}[!] {session_name} Invalid"
 
-        await join_if_private(client, target)
-        entity, bio, links = await collect_target_intel(client, target)
-        legal_msg = generate_legal_report(mode, str(entity.id), bio, links)
-        messages = await client.get_messages(entity, limit=25)
-        msg_ids = [m.id for m in messages if m.id] if messages else []
-
-        reason_map = {
-            'spam': types.InputReportReasonSpam(),
-            'violence': types.InputReportReasonViolence(),
-            'pornography': types.InputReportReasonPornography(),
-            'child_abuse': types.InputReportReasonChildAbuse(),
-            'fake_account': types.InputReportReasonFake(),
-            'copyright': types.InputReportReasonCopyright(),
-            'drugs': types.InputReportReasonIllegalDrugs(),
-            'personal_details': types.InputReportReasonGeoIrrelevant(),
-            'other': types.InputReportReasonOther()
-        }
-        selected_reason = reason_map.get(mode.lower(), types.InputReportReasonOther())
-
-        print(f"{Fore.YELLOW}[*] {session_name} is launching legal attack on {type(entity).__name__}...")
-
-        for i in range(1, count + 1):
-            try:
-                await client(functions.account.ReportPeerRequest(
-                    peer=entity, reason=selected_reason, message=legal_msg
-                ))
-                if msg_ids:
-                    await client(functions.messages.ReportRequest(
-                        peer=entity, id=msg_ids, reason=selected_reason, message=legal_msg
-                    ))
-
-                print(f"{Fore.CYAN}[{session_name}] {Fore.GREEN}Report {i}/{count} Delivered. status: SUCCESS")
-                await asyncio.sleep(random.randint(15, 30))
-
-            except errors.FloodWaitError as e:
-                print(f"{Fore.RED}[!] Rate Limit hit. Sleeping for {e.seconds}s")
-                await asyncio.sleep(e.seconds)
-            except Exception as e:
-                print(f"{Fore.RED}[❌] Batch Failed: {e}")
-                break
-    finally:
+        entity = await client.get_entity(target)
+        
+        # Fast Reports
+        await client(functions.account.ReportPeerRequest(
+            peer=entity, reason=selected_reason, message=legal_msg
+        ))
+        if msg_ids:
+            await client(functions.messages.ReportRequest(
+                peer=entity, id=msg_ids, reason=selected_reason, message=legal_msg
+            ))
+        
         await client.disconnect()
+        return f"{Fore.CYAN}[{session_name}] {Fore.GREEN}Report Sent ✅"
+    except Exception as e:
+        return f"{Fore.RED}[{session_name}] Failed"
 
 # --- MAIN INTERFACE ---
 
 async def main():
-    # Updated Nobita Banner
     print(f"""{Fore.CYAN}{Style.BRIGHT}
     ███╗   ██╗ ██████╗ ██████╗ ██╗████████╗ █████╗ 
     ████╗  ██║██╔═══██╗██╔══██╗██║╚══██╔══╝██╔══██╗
@@ -154,7 +113,7 @@ async def main():
     ██║╚██╗██║██║   ██║██╔══██╗██║   ██║   ██╔══██║
     ██║ ╚████║╚██████╔╝██████╔╝██║   ██║   ██║  ██║
     ╚═╝  ╚═══╝ ╚═════╝ ╚═════╝ ╚═╝   ╚═╝   ╚═╝  ╚═╝
-              {Fore.WHITE}BY NOBITA | ADVANCED TERMINATOR v4.0
+              {Fore.WHITE}BY NOBITA | TURBO TERMINATOR v5.5
     """)
 
     parser = argparse.ArgumentParser()
@@ -173,24 +132,52 @@ async def main():
         return
 
     if args.target and args.mode:
-        sessions = [f for f in os.listdir(SESSION_DIR) if f.endswith('.session')]
+        sessions = [f.replace('.session', '') for f in os.listdir(SESSION_DIR) if f.endswith('.session')]
         if not sessions:
-            print(f"{Fore.RED}[!] No accounts found. Use -an to login.")
+            print(f"{Fore.RED}[!] No accounts found.")
             return
 
-        print(f"{Fore.MAGENTA}[!] INITIATING SYSTEM TERMINATION SEQUENCE ON: {args.target}")
-        for s in sessions:
-            s_name = s.replace('.session', '')
-            await run_termination_sequence(s_name, args.target, args.count, args.mode)
-            print(f"{Fore.BLUE}[i] Account switch in progress... Randomized safety gap.")
-            await asyncio.sleep(random.randint(30, 60))
-        print(f"{Fore.GREEN}\n[✓] ALL REPORTS SUBMITTED BY NOBITA SYSTEM.")
+        print(f"{Fore.MAGENTA}[!] TURBO SYNC ATTACK ON: {args.target}")
+        
+        # Reason Mapping
+        reason_map = {
+            'spam': types.InputReportReasonSpam(),
+            'violence': types.InputReportReasonViolence(),
+            'pornography': types.InputReportReasonPornography(),
+            'child_abuse': types.InputReportReasonChildAbuse(),
+            'fake_account': types.InputReportReasonFake(),
+            'other': types.InputReportReasonOther()
+        }
+        selected_reason = reason_map.get(args.mode.lower(), types.InputReportReasonOther())
+
+        # Quick Intel
+        master = TelegramClient(os.path.join(SESSION_DIR, sessions[0]), API_ID, API_HASH)
+        await master.connect()
+        entity, bio, links = await collect_target_intel(master, args.target)
+        msgs = await master.get_messages(entity, limit=15)
+        msg_ids = [m.id for m in msgs]
+        legal_msg = generate_legal_report(args.mode, str(entity.id if entity else "Target"), bio, links)
+        await master.disconnect()
+
+        # TURBO ROUND SYSTEM
+        for r in range(1, args.count + 1):
+            print(f"{Fore.YELLOW}\n>>> ROUND {r} (Turbo Launching All IDs)")
+            
+            tasks = [single_sync_report(s, args.target, selected_reason, legal_msg, msg_ids) for s in sessions]
+            results = await asyncio.gather(*tasks)
+            for res in results: print(res)
+            
+            if r < args.count:
+                wait = random.randint(5, 10) # Reduced for Speed
+                print(f"{Fore.BLUE}[i] Waiting {wait}s for next Turbo Round...")
+                await asyncio.sleep(wait)
+        
+        print(f"{Fore.GREEN}\n[✓] TURBO ATTACK COMPLETED BY NOBITA.")
     else:
-        print(f"{Fore.YELLOW}Usage: python3 script.py -t @target -m spam -r 5")
+        print(f"{Fore.YELLOW}Usage: python3 reper.py -t @target -m spam -r 5")
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print(f"\n{Fore.RED}[!] Script stopped by Nobita.")
         sys.exit()
