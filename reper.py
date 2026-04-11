@@ -11,10 +11,10 @@ from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.functions.channels import GetFullChannelRequest
 from colorama import Fore, init, Style
 
-# Initialize Colorama for aesthetic CLI
+# Initialize Colorama
 init(autoreset=True)
 
-# --- ADVANCED CONFIGURATION ---
+# --- CONFIGURATION ---
 API_ID = 20106942 
 API_HASH = '3bfe2013e4399af96d78640db6dcd601'
 SESSION_DIR = 'sessions'
@@ -22,48 +22,22 @@ SESSION_DIR = 'sessions'
 if not os.path.exists(SESSION_DIR):
     os.makedirs(SESSION_DIR)
 
-# --- LEGAL COMPLAINT GENERATOR ---
+# --- FULL LEGAL COMPLAINT GENERATOR ---
 def generate_legal_report(mode, entity_name, bio_content, links):
     link_report = f" Detected malicious links: {', '.join(links)}" if links else ""
-    
     templates = {
-        'child_abuse': (
-            f"URGENT LEGAL NOTICE: This entity ({entity_name}) is involved in the distribution and promotion "
-            "of prohibited CSAM content. This is a severe violation of international law. {link_report}"
-        ),
-        'violence': (
-            f"CRITICAL SAFETY WARNING: The entity {entity_name} is actively inciting real-world violence and "
-            f"promoting extremist ideologies. Public safety is at risk. {link_report}"
-        ),
-        'pornography': (
-            f"POLICY VIOLATION: Non-consensual sexual content and prohibited adult media are being distributed "
-            f"by this entity. Violates Telegram's searchable content regulations. {link_report}"
-        ),
-        'drugs': (
-            f"ILLEGAL TRAFFICKING: Evidence of illegal drug sales and prohibited substance distribution "
-            f"identified within this entity's activities. Bio: {bio_content[:50]}..."
-        ),
-        'personal_details': (
-            f"PRIVACY BREACH (DOXXING): This entity is sharing sensitive personal information of individuals "
-            "without legal consent. Harassment campaign detected."
-        ),
-        'spam': (
-            f"DECEPTIVE PRACTICES: This bot/channel is using high-traffic keywords (e.g., Instagram Viral) "
-            f"to lure users into a phishing network. Deceptive redirects found. {link_report}"
-        ),
-        'fake_account': (
-            f"IMPERSONATION FRAUD: This entity is fraudulently claiming to be an official representative. "
-            f"Using deceptive branding to scam users. {link_report}"
-        ),
-        'other': (
-            f"GENERAL TOS VIOLATION: This entity {entity_name} has multiple breaches of Telegram's guidelines. "
-            f"Bio Analysis: {bio_content[:100]}... {link_report}"
-        )
+        'child_abuse': f"URGENT LEGAL NOTICE: This entity ({entity_name}) is involved in the distribution of prohibited CSAM content. International law violation. {link_report}",
+        'violence': f"CRITICAL SAFETY WARNING: The entity {entity_name} is actively inciting real-world violence. Public safety risk. {link_report}",
+        'pornography': f"POLICY VIOLATION: Non-consensual sexual content distributed by this entity. {link_report}",
+        'drugs': f"ILLEGAL TRAFFICKING: Evidence of prohibited substance distribution identified. Bio: {bio_content[:50]}...",
+        'personal_details': f"PRIVACY BREACH: This entity is sharing sensitive personal information without consent.",
+        'spam': f"DECEPTIVE PRACTICES: This bot/channel is a phishing network using deceptive redirects. {link_report}",
+        'fake_account': f"IMPERSONATION FRAUD: Claiming to be an official representative to scam users. {link_report}",
+        'other': f"GENERAL TOS VIOLATION: Entity {entity_name} has multiple breaches of guidelines. Bio: {bio_content[:100]}..."
     }
     return templates.get(mode.lower(), templates['other'])
 
-# --- CORE LOGIC FUNCTIONS ---
-
+# --- ADVANCED INTEL FUNCTIONS ---
 async def collect_target_intel(client, target):
     bio, links = "", []
     try:
@@ -79,32 +53,29 @@ async def collect_target_intel(client, target):
     except:
         return None, "", []
 
+# --- TURBO SYNC REPORTER ---
 async def single_sync_report(session_name, target, selected_reason, legal_msg, msg_ids):
-    """TURBO MODE: Fast reporting logic"""
     client = TelegramClient(os.path.join(SESSION_DIR, session_name), API_ID, API_HASH)
     try:
         await client.connect()
         if not await client.is_user_authorized():
-            return f"{Fore.RED}[!] {session_name} Invalid"
+            return f"{Fore.RED}[!] {session_name} Invalid/Unauthorized"
 
         entity = await client.get_entity(target)
-        
-        # Fast Reports
-        await client(functions.account.ReportPeerRequest(
-            peer=entity, reason=selected_reason, message=legal_msg
-        ))
+        # Peer Report
+        await client(functions.account.ReportPeerRequest(peer=entity, reason=selected_reason, message=legal_msg))
+        # Evidence Report
         if msg_ids:
-            await client(functions.messages.ReportRequest(
-                peer=entity, id=msg_ids, reason=selected_reason, message=legal_msg
-            ))
+            await client(functions.messages.ReportRequest(peer=entity, id=msg_ids, reason=selected_reason, message=legal_msg))
         
         await client.disconnect()
         return f"{Fore.CYAN}[{session_name}] {Fore.GREEN}Report Sent ✅"
+    except errors.FloodWaitError as e:
+        return f"{Fore.YELLOW}[{session_name}] FloodWait: {e.seconds}s"
     except Exception as e:
-        return f"{Fore.RED}[{session_name}] Failed"
+        return f"{Fore.RED}[{session_name}] Failed: {str(e)[:20]}"
 
 # --- MAIN INTERFACE ---
-
 async def main():
     print(f"""{Fore.CYAN}{Style.BRIGHT}
     ███╗   ██╗ ██████╗ ██████╗ ██╗████████╗ █████╗ 
@@ -113,7 +84,7 @@ async def main():
     ██║╚██╗██║██║   ██║██╔══██╗██║   ██║   ██╔══██║
     ██║ ╚████║╚██████╔╝██████╔╝██║   ██║   ██║  ██║
     ╚═╝  ╚═══╝ ╚═════╝ ╚═════╝ ╚═╝   ╚═╝   ╚═╝  ╚═╝
-              {Fore.WHITE}BY NOBITA | TURBO TERMINATOR v5.5
+              {Fore.WHITE}BY NOBITA | PRO TURBO SYNC v5.8
     """)
 
     parser = argparse.ArgumentParser()
@@ -127,30 +98,18 @@ async def main():
         session_id = f"Ac_{args.add_number[-4:]}"
         client = TelegramClient(os.path.join(SESSION_DIR, session_id), API_ID, API_HASH)
         await client.start(args.add_number)
-        print(f"{Fore.GREEN}[V] Account {args.add_number} is now in the Nobita pool.")
+        print(f"{Fore.GREEN}[V] Account {args.add_number} is now in the pool.")
         await client.disconnect()
         return
 
     if args.target and args.mode:
-        sessions = [f.replace('.session', '') for f in os.listdir(SESSION_DIR) if f.endswith('.session')]
+        sessions = [f.replace('.session', '') for f in os.listdir(SESSION_DIR) if f.endswith('.session') and "Ac_+" not in f]
         if not sessions:
-            print(f"{Fore.RED}[!] No accounts found.")
-            return
+            print(f"{Fore.RED}[!] No accounts found. Use -an to login."); return
 
-        print(f"{Fore.MAGENTA}[!] TURBO SYNC ATTACK ON: {args.target}")
+        print(f"{Fore.MAGENTA}[!] INITIATING SYNC ATTACK ON: {args.target}")
         
-        # Reason Mapping
-        reason_map = {
-            'spam': types.InputReportReasonSpam(),
-            'violence': types.InputReportReasonViolence(),
-            'pornography': types.InputReportReasonPornography(),
-            'child_abuse': types.InputReportReasonChildAbuse(),
-            'fake_account': types.InputReportReasonFake(),
-            'other': types.InputReportReasonOther()
-        }
-        selected_reason = reason_map.get(args.mode.lower(), types.InputReportReasonOther())
-
-        # Quick Intel
+        # Intel Gathering
         master = TelegramClient(os.path.join(SESSION_DIR, sessions[0]), API_ID, API_HASH)
         await master.connect()
         entity, bio, links = await collect_target_intel(master, args.target)
@@ -159,20 +118,27 @@ async def main():
         legal_msg = generate_legal_report(args.mode, str(entity.id if entity else "Target"), bio, links)
         await master.disconnect()
 
-        # TURBO ROUND SYSTEM
+        reason_map = {
+            'spam': types.InputReportReasonSpam(), 'violence': types.InputReportReasonViolence(),
+            'pornography': types.InputReportReasonPornography(), 'child_abuse': types.InputReportReasonChildAbuse(),
+            'fake_account': types.InputReportReasonFake(), 'copyright': types.InputReportReasonCopyright(),
+            'drugs': types.InputReportReasonIllegalDrugs(), 'personal_details': types.InputReportReasonGeoIrrelevant(),
+            'other': types.InputReportReasonOther()
+        }
+        selected_reason = reason_map.get(args.mode.lower(), types.InputReportReasonOther())
+
         for r in range(1, args.count + 1):
-            print(f"{Fore.YELLOW}\n>>> ROUND {r} (Turbo Launching All IDs)")
-            
+            print(f"{Fore.YELLOW}\n>>> ROUND {r} (Syncing {len(sessions)} Accounts)")
             tasks = [single_sync_report(s, args.target, selected_reason, legal_msg, msg_ids) for s in sessions]
             results = await asyncio.gather(*tasks)
             for res in results: print(res)
             
             if r < args.count:
-                wait = random.randint(5, 10) # Reduced for Speed
-                print(f"{Fore.BLUE}[i] Waiting {wait}s for next Turbo Round...")
+                wait = random.randint(5, 10)
+                print(f"{Fore.BLUE}[i] Round complete. Waiting {wait}s...")
                 await asyncio.sleep(wait)
         
-        print(f"{Fore.GREEN}\n[✓] TURBO ATTACK COMPLETED BY NOBITA.")
+        print(f"{Fore.GREEN}\n[✓] ALL SYNC ROUNDS COMPLETED.")
     else:
         print(f"{Fore.YELLOW}Usage: python3 reper.py -t @target -m spam -r 5")
 
