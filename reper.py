@@ -1,177 +1,121 @@
-import asyncio
-import os
-import random
-import re
-import sys
-from telethon import TelegramClient, types, errors
-from telethon.tl.functions.messages import ReportRequest
-from telethon.tl.functions.account import ReportPeerRequest
+from telethon.sync import TelegramClient
 from telethon.tl.functions.channels import JoinChannelRequest
-from colorama import Fore, init, Style
+from telethon.tl.functions.messages import SendMessageRequest
+from telethon.errors.rpcerrorlist import PhoneNumberInvalidError
+from telethon import functions, types
+from os import listdir, mkdir
+from sys import argv
+from re import search
+from colorama import Fore
+import asyncio, argparse
 
-init(autoreset=True)
+# --- Arguments Setup (Original Style) ---
+argument_parser = argparse.ArgumentParser(description='Multi-purpose Telegram Reporter by Sachin', add_help=False)
+argument_parser.add_argument('-an', '--add-number', help='Add a new account')
+argument_parser.add_argument('-r', '--run', help='Number of reports per account', type=int)
+argument_parser.add_argument('-t', '--target', help='Target username (without @)', type=str)
+argument_parser.add_argument('-m', '--mode', help='set reason of reports', choices=['spam', 'fake', 'violence', 'child_abuse', 'porn', 'geo'])
+argument_parser.add_argument('-re', '--reasons', help='shows list of reasons', action='store_true')
+argument_parser.add_argument('-h', '--help', action='store_true')
+command_line_args = argument_parser.parse_args()
 
-# --- API CONFIG ---
-API_ID = 20106942 
-API_HASH = '3bfe2013e4399af96d78640db6dcd601'
-SESSION_DIR = 'sessions'
+try:
+    mkdir('sessions')
+except: pass
 
-# Advanced Device List for Hard Spoofing
-MODERN_DEVICES = [
-    {'device': 'Google Pixel 8 Pro', 'sys': 'Android 14'},
-    {'device': 'iPhone 15 Pro Max', 'sys': 'iOS 17.4'},
-    {'device': 'Samsung Galaxy S24 Ultra', 'sys': 'Android 14'},
-    {'device': 'Xiaomi 14 Ultra', 'sys': 'Android 13'},
-    {'device': 'OnePlus 12', 'sys': 'Android 14'},
-    {'device': 'iPad Pro M2', 'sys': 'iPadOS 17.1'}
-]
+session_files = [f for f in listdir('sessions') if f.endswith('.session')]
+session_files.sort()
+api_id = 25148883
+api_hash = 'abc30c3b47a075ec9a0854b3015ef210'
 
-def get_banner():
-    return f"""{Fore.RED}{Style.BRIGHT}
-    ███╗   ██╗ ██████╗ ██████╗ ██╗████████╗ █████╗ 
-    ████╗  ██║██╔═══██╗██╔══██╗██║╚══██╔══╝██╔══██╗
-    ██╔██╗ ██║██║   ██║██████╔╝██║   ██║   ███████║
-    ██║╚██╗██║██║   ██║██╔══██╗██║   ██║   ██╔══██║
-    ██║ ╚████║╚██████╔╝██████╔╝██║   ██║   ██║  ██║
-    ╚═╝  ╚═══╝ ╚═════╝ ╚═════╝ ╚═╝   ╚═╝   ╚═╝  ╚═╝
-    {Fore.CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    {Fore.WHITE}       DEVELOPER: {Fore.YELLOW}NOBITA (VORTEX)
-    {Fore.WHITE}       TELEGRAM ID: {Fore.GREEN}7081885854
-    {Fore.CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    """
+def get_reason(mode):
+    reasons = {
+        'spam': types.InputReportReasonSpam(),
+        'fake': types.InputReportReasonFake(),
+        'violence': types.InputReportReasonViolence(),
+        'child_abuse': types.InputReportReasonChildAbuse(),
+        'porn': types.InputReportReasonPornography(),
+        'geo': types.InputReportReasonGeoIrrelevant()
+    }
+    return reasons.get(mode, types.InputReportReasonSpam())
 
-async def report_worker(index, session_name, target, reason, report_msg, msg_ids, is_private):
-    # Har session ko ek alag modern device assign karna
-    dev_info = random.choice(MODERN_DEVICES)
-    
-    client = TelegramClient(
-        os.path.join(SESSION_DIR, session_name), 
-        API_ID, API_HASH,
-        device_model=dev_info['device'],
-        system_version=dev_info['sys'],
-        app_version="10.8.1"
-    )
-    
+# --- Help & Reasons UI ---
+if command_line_args.help:
+    print(f'''Help:
+  -an {Fore.LIGHTBLUE_EX}NUMBER{Fore.RESET} ~> {Fore.YELLOW}Add account{Fore.RESET}
+  -r {Fore.LIGHTBLUE_EX}COUNT{Fore.RESET} -t {Fore.LIGHTBLUE_EX}TARGET{Fore.RESET} -m {Fore.LIGHTBLUE_EX}MODE{Fore.RESET} ~> {Fore.YELLOW}Run reports{Fore.RESET}
+  Example: python3 {argv[0]} -r 50 -t BadChannel -m spam''')
+
+elif command_line_args.reasons:
+    print(f"List of reasons: {Fore.YELLOW}spam, fake, violence, child_abuse, pornography, geo{Fore.RESET}")
+
+# --- Add New Account Logic ---
+elif command_line_args.add_number:
+    phone = command_line_args.add_number
+    new_idx = len(session_files) + 1
+    client = TelegramClient(f'sessions/Ac{new_idx}', api_id, api_hash)
     try:
-        await client.connect()
-        if not await client.is_user_authorized():
-            return f"{Fore.RED}[{index}] {session_name}: Invalid Session ❌"
-
-        # Private links join logic
-        if is_private and ("t.me/+" in target or "t.me/joinchat/" in target):
-            try: await client(JoinChannelRequest(target))
-            except: pass
-
-        entity = await client.get_entity(target)
-        
-        # 1. Profile/Account Report
-        await client(ReportPeerRequest(peer=entity, reason=reason, message=report_msg))
-        
-        # 2. Evidence Message Report (Hard Impact)
-        if msg_ids:
-            # Batch report messages for evidence
-            await client(ReportRequest(peer=entity, id=msg_ids, reason=reason, message=report_msg))
-
-        await client.disconnect()
-        return f"{Fore.CYAN}[{index}] {Fore.WHITE}{session_name} {Fore.GREEN}SUCCESS ✅ {Fore.LIGHTBLACK_EX}({dev_info['device']})"
-    
-    except errors.FloodWaitError as e:
-        return f"{Fore.YELLOW}[{index}] {session_name}: FloodWait {e.seconds}s"
+        client.start(phone)
+        print(f' [{Fore.GREEN}✅{Fore.RESET}] Account Ac{new_idx} added successfully!')
     except Exception as e:
-        return f"{Fore.RED}[{index}] {session_name}: Failed ({type(e).__name__}) ❌"
+        print(f' [{Fore.RED}!{Fore.RESET}] Error: {e}')
 
-async def main():
-    os.system('clear' if os.name == 'posix' else 'cls')
-    print(get_banner())
+# --- Main Reporting Logic ---
+elif command_line_args.run and command_line_args.target and command_line_args.mode:
+    async def report_channel(session_file):
+        s_name = session_file.replace(".session", "")
+        client = TelegramClient(f'sessions/{s_name}', api_id, api_hash)
+        async with client:
+            try:
+                me = await client.get_me()
+                target = await client.get_entity(command_line_args.target)
+                
+                # 1. BOT CHECK: Agar bot hai toh pehle /start karna padega messages ke liye
+                if isinstance(target, types.User) and target.bot:
+                    await client(SendMessageRequest(peer=target, message='/start'))
+                    await asyncio.sleep(2)
 
-    # --- STEP 1: TARGET TYPE ---
-    print(f"{Fore.MAGENTA}[+] SELECT TARGET TYPE:")
-    print("1. User/Bot (@username)")
-    print("2. Public Channel/Group (@link)")
-    print("3. Private Channel/Group (Invite Link)")
-    t_choice = input(f"{Fore.YELLOW}Choice (1-3): ")
-    target = input(f"{Fore.YELLOW}Enter Target/Link: ")
+                # 2. JOIN CHECK: Agar channel/group hai toh join karna zaroori hai
+                if isinstance(target, (types.Channel, types.Chat)):
+                    try:
+                        await client(JoinChannelRequest(target))
+                        await asyncio.sleep(1)
+                    except: pass
 
-    # --- STEP 2: REASON & FORM ---
-    print(f"\n{Fore.MAGENTA}[+] SELECT REPORT REASON:")
-    print("1. Spam (Phishing & Bots)\n2. Pornography (Illegal Adult Content)\n3. Child Abuse (Urgent/CSAM)\n4. Fraud (Scam/Copyright)\n5. Violence (Hate Speech)")
-    r_choice = input(f"{Fore.YELLOW}Choice (1-5): ")
+                # 3. MESSAGE FETCH: Reporting ke liye message IDs pick karna
+                messages = await client.get_messages(target, limit=5)
+                msg_ids = [m.id for m in messages] if messages else [0]
+                
+                report_reason = get_reason(command_line_args.mode)
 
-    # Bada aur Hard Report Message (Report Form)
-    report_forms = {
-        '1': "LEGAL REPORT: Coordinated spam network detected. This entity is spreading malicious phishing links, automated bot spam, and violating Telegram's API Terms of Service. Immediate termination required to protect the community.",
-        '2': "VIOLATION NOTICE: This account/channel is distributing non-consensual and prohibited pornographic material. This is a direct breach of Safety Guidelines regarding adult content distribution.",
-        '3': "CRITICAL URGENT REPORT: Prohibited CSAM material detected. This entity is acting as a distribution hub for illegal child safety violations. This requires immediate suspension under international safety laws.",
-        '4': "FRAUD ALERT: Systematic financial fraud and deceptive practices. This account is luring users into crypto scams and phishing operations to steal personal data and funds.",
-        '5': "SAFETY BREACH: Coordination of violent threats and promotion of hate speech. This entity is inciting harm and violating the fundamental community standards of Telegram."
-    }
-    legal_msg = report_forms.get(r_choice, "General Violation: Breach of Telegram Terms of Service and Safety Regulations.")
+                # 4. REPORT LOOP
+                for i in range(command_line_args.run):
+                    try:
+                        # 2026 MTProto v1.40+ compatible call
+                        await client(functions.messages.ReportRequest(
+                            peer=target,
+                            id=msg_ids,
+                            option=b'', 
+                            message=f"Reporting for {command_line_args.mode} content"
+                        ))
+                        print(f" [{Fore.GREEN}✅{Fore.RESET}] {Fore.CYAN}{me.first_name}{Fore.RESET} -> Reported {i+1}")
+                        
+                        # Anti-Flood Delay: ID bachane ke liye zaroori hai
+                        await asyncio.sleep(3) 
+                    except Exception as e:
+                        print(f" [{Fore.RED}!{Fore.RESET}] Account {me.first_name} error: {e}")
+                        break
+            except Exception as e:
+                print(f" [{Fore.RED}!{Fore.RESET}] Session {session_file} failed: {e}")
 
-    # --- STEP 3: ATTACK CONFIG ---
-    print(f"\n{Fore.MAGENTA}[+] ATTACK CONFIGURATION:")
-    num_ids_input = input(f"{Fore.YELLOW}How many IDs to use? (Blank = All): ")
-    rounds = int(input(f"{Fore.YELLOW}How many rounds of attack?: ") or 1)
+    async def run_all_accounts():
+        tasks = [report_channel(s) for s in session_files]
+        await asyncio.gather(*tasks)
 
-    all_sessions = [f.replace('.session', '') for f in os.listdir(SESSION_DIR) if f.endswith('.session')]
-    if not all_sessions:
-        print(f"{Fore.RED}[!] Sessions folder khali hai!"); return
-
-    if num_ids_input.isdigit():
-        sessions = all_sessions[:int(num_ids_input)]
+    if not session_files:
+        print(f" [{Fore.RED}!{Fore.RESET}] No accounts in 'sessions/' folder. Use -an first.")
     else:
-        sessions = all_sessions
+        asyncio.run(run_all_accounts())
 
-    # Map Reason
-    reason_map = {
-        '1': types.InputReportReasonSpam(),
-        '2': types.InputReportReasonPornography(),
-        '3': types.InputReportReasonChildAbuse(),
-        '4': types.InputReportReasonCopyright(),
-        '5': types.InputReportReasonViolence()
-    }
-    selected_reason = reason_map.get(r_choice, types.InputReportReasonOther())
-
-    # Evidence Scraping
-    print(f"\n{Fore.BLUE}[*] Gathering evidence from {target}...")
-    master = TelegramClient(os.path.join(SESSION_DIR, sessions[0]), API_ID, API_HASH)
-    msg_ids = []
-    try:
-        await master.connect()
-        is_private = True if t_choice == '3' else False
-        if is_private:
-            try: await master(JoinChannelRequest(target))
-            except: pass
-        
-        m_list = await master.get_messages(target, limit=15)
-        msg_ids = [m.id for m in m_list]
-        await master.disconnect()
-    except: pass
-
-    # --- STEP 4: EXECUTION ---
-    print(f"\n{Fore.GREEN}🚀 NOBITA MASS REPORTER LAUNCHED ON: {target}")
-    print(f"{Fore.WHITE}IDs: {len(sessions)} | Rounds: {rounds}\n")
-
-    for r in range(rounds):
-        print(f"{Fore.MAGENTA}--- ATTACK WAVE {r+1} (SIMULTANEOUS) ---")
-        
-        tasks = []
-        for i, s in enumerate(sessions, 1):
-            tasks.append(report_worker(i, s, target, selected_reason, legal_msg, msg_ids, (t_choice == '3')))
-        
-        # Saari IDs ek hi microsecond mein trigger hongi
-        results = await asyncio.gather(*tasks)
-        
-        # Output sequential dikhega (1, 2, 3...)
-        for res in results:
-            print(res)
-            await asyncio.sleep(0.04)
-
-        if r < rounds - 1:
-            print(f"\n{Fore.YELLOW}[!] Cooling down for 12 seconds...")
-            await asyncio.sleep(12)
-
-    print(f"\n{Fore.GREEN}[🏁] ATTACK COMPLETED. TARGET REPORTED {len(sessions) * rounds} TIMES.")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-    
+else:
+    print(f"{Fore.MAGENTA}Sachin Reporter Tool{Fore.RESET} - use --help for info.")
