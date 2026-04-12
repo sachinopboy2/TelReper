@@ -25,8 +25,8 @@ except: pass
 
 session_files = [f for f in listdir('sessions') if f.endswith('.session')]
 session_files.sort()
-api_id = 25148883
-api_hash = 'abc30c3b47a075ec9a0854b3015ef210'
+api_id = 20106942
+api_hash = '3bfe2013e4399af96d78640db6dcd601'
 
 def get_reason(mode):
     reasons = {
