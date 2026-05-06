@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # ─━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  NOBITA — Telegram Mass Report Engine v4.2
+#  NOBITA — Telegram Mass Report Engine v4.2 (Verified Edition)
 #  Author: @Mr3rf1
 #  Channel: t.me/Mr3rf1
-#  Build: 2026.05.05
+#  Build: 2026.05.06
 # ─━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import asyncio
@@ -44,7 +44,7 @@ from telethon.tl.types import (
 # ─── INIT ───────────────────────────────────────────────────────────────────────
 init(autoreset=True)
 VERSION = "4.2"
-BUILD = "2026.05.05"
+BUILD = "2026.05.06"
 
 # ─── CREDENTIALS ────────────────────────────────────────────────────────────────
 API_ID = 20106942
@@ -195,43 +195,21 @@ async def perform_extra_human_action(client):
 async def safe_join_channel(client, target_entity, account_num: int) -> bool:
     """
     Safely handle joining ANY type of target.
-    
-    - Open channels: joins with 5-6s gap
-    - Private channels: skips join, reports anyway
-    - Join Request groups: skips join, reports anyway
-    - Users/bots: no join needed
-    - ANY error: reports still go through
-    
-    ALWAYS returns True — NEVER blocks reporting.
     """
-    
-    # ── Detect target type ──
     entity_type = "unknown"
     try:
         if hasattr(target_entity, 'broadcast') and target_entity.broadcast:
             entity_type = "channel"
         elif hasattr(target_entity, 'megagroup') and target_entity.megagroup:
             entity_type = "group"
-        elif hasattr(target_entity, 'gigagroup') and target_entity.gigagroup:
-            entity_type = "group"
         elif hasattr(target_entity, 'username') and target_entity.username:
             entity_type = "user_or_bot"
-        else:
-            entity_type = "chat"
     except Exception:
         pass
     
-    # ── Users/bots don't need joining ──
     if entity_type == "user_or_bot":
-        print(
-            f" [{Fore.CYAN}ℹ{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-            f"Target is a user — reporting directly"
-        )
-        await asyncio.sleep(random.uniform(1.0, 2.0))
         return True
     
-    # ── Check if already member ──
     already_member = False
     try:
         await client.get_participants(target_entity, limit=1)
@@ -240,94 +218,13 @@ async def safe_join_channel(client, target_entity, account_num: int) -> bool:
         pass
     
     if already_member:
-        print(
-            f" [{Fore.GREEN}✓{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-            f"Already a member — no join needed"
-        )
         return True
     
-    # ── Try to join ──
     try:
-        gap = random.uniform(5.0, 6.5)
-        print(
-            f" [{Fore.CYAN}⏳{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-            f"Joining in {gap:.1f}s..."
-        )
-        await asyncio.sleep(gap)
-        
         await client(functions.channels.JoinChannelRequest(target_entity))
-        
-        post_gap = random.uniform(5.0, 6.5)
-        print(
-            f" [{Fore.GREEN}✓{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-            f"Joined | Waiting {post_gap:.1f}s..."
-        )
-        await asyncio.sleep(post_gap)
+        await asyncio.sleep(random.uniform(5.0, 6.5))
         return True
-    
-    except UserAlreadyParticipantError:
-        return True
-    
-    except ChannelPrivateError:
-        print(
-            f" [{Fore.YELLOW}~{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-            f"Private channel — {Fore.GREEN}reporting without joining{Fore.RESET}"
-        )
-        return True
-    
-    except (InviteHashInvalidError, InviteHashExpiredError):
-        print(
-            f" [{Fore.YELLOW}~{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-            f"Invite invalid — {Fore.GREEN}reporting anyway{Fore.RESET}"
-        )
-        return True
-    
-    except ChannelsTooMuchError:
-        print(
-            f" [{Fore.YELLOW}~{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-            f"Too many channels — {Fore.GREEN}reporting anyway{Fore.RESET}"
-        )
-        return True
-    
-    except UsersTooMuchError:
-        print(
-            f" [{Fore.YELLOW}~{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-            f"Group full — {Fore.GREEN}reporting anyway{Fore.RESET}"
-        )
-        return True
-    
-    except FloodWaitError as e:
-        wait = e.seconds
-        print(
-            f" [{Fore.RED}!{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-            f"Join flood {wait}s"
-        )
-        if wait <= 60:
-            await asyncio.sleep(wait + random.uniform(2, 5))
-            return True
-        print(
-            f" [{Fore.YELLOW}~{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-            f"Flood too long — {Fore.GREEN}reporting directly{Fore.RESET}"
-        )
-        return True
-    
-    except Exception as e:
-        err = str(e).lower()
-        # ANY join error — report still goes through
-        print(
-            f" [{Fore.YELLOW}~{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-            f"{err[:60]} — {Fore.GREEN}reporting anyway{Fore.RESET}"
-        )
+    except Exception:
         return True
 
 
@@ -344,62 +241,26 @@ async def report_worker(
     results: list,
 ):
     """Single account worker with full human-like behavior."""
-    
     client = TelegramClient(session_path, API_ID, API_HASH)
     profile = random.choice(TIMING_PROFILES)
     min_delay, max_delay, action_chance = profile
     
     try:
         await client.connect()
-        
         if not await client.is_user_authorized():
-            print(
-                f" [{Fore.RED}✗{Fore.RESET}] "
-                f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-                f"Not authorized — skipping"
-            )
             results.append({"account": account_num, "success": 0, "total": 0})
             return
         
         me = await client.get_entity("self")
         user_name = me.first_name or me.username or f"User{me.id}"
         
-        # ── Resolve target ──
         try:
             target_entity = await client.get_entity(target)
-        except ValueError:
-            print(
-                f" [{Fore.RED}✗{Fore.RESET}] "
-                f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-                f"Target '{target}' not found"
-            )
-            results.append({"account": account_num, "success": 0, "total": 0})
-            return
         except Exception as e:
-            print(
-                f" [{Fore.RED}✗{Fore.RESET}] "
-                f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-                f"Resolve error: {str(e)[:60]}"
-            )
             results.append({"account": account_num, "success": 0, "total": 0})
             return
         
-        # ── Safe join (NEVER blocks reporting) ──
-        print(
-            f" [{Fore.CYAN}ℹ{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET} "
-            f"({Fore.GREEN}{user_name}{Fore.RESET}): "
-            f"Preparing @{Fore.LIGHTMAGENTA_EX}{target}{Fore.RESET}..."
-        )
         await safe_join_channel(client, target_entity, account_num)
-        
-        print(
-            f" [{Fore.CYAN}▶{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET} "
-            f"({user_name}): "
-            f"{Fore.LIGHTBLUE_EX}{report_count}{Fore.RESET} reports "
-            f"[{min_delay}-{max_delay}s profile]"
-        )
         
         success = 0
         failed = 0
@@ -407,158 +268,94 @@ async def report_worker(
         for i in range(1, report_count + 1):
             try:
                 msg = random.choice(REPORT_MESSAGES)
-                if random.random() < 0.10:
-                    msg += random.choice([
-                        " [urgent]", " [review]", " [flagged]", 
-                        f" [{random.randint(1000,9999)}]",
-                    ])
-                
-                await asyncio.sleep(random.uniform(0.5, 2.0))
-                
-                result = await client(
-                    ReportPeerRequest(
-                        peer=target_entity,
-                        reason=reason_class(),
-                        message=msg,
-                    )
-                )
-                
-                if result:
-                    success += 1
-                    print(
-                        f" [{Fore.GREEN}✓{Fore.RESET}] "
-                        f"Ac{Fore.YELLOW}{account_num}{Fore.RESET} "
-                        f"#{i}/{report_count} REPORTED"
-                    )
-                else:
-                    failed += 1
-                    print(
-                        f" [{Fore.YELLOW}~{Fore.RESET}] "
-                        f"Ac{Fore.YELLOW}{account_num}{Fore.RESET} "
-                        f"#{i}/{report_count} no response"
-                    )
+                await client(ReportPeerRequest(peer=target_entity, reason=reason_class(), message=msg))
+                success += 1
+                print(f" [{Fore.GREEN}✓{Fore.RESET}] Ac{account_num} #{i}/{report_count} REPORTED")
                 
                 if random.random() < action_chance:
                     await perform_extra_human_action(client)
                 
-                delay = random.uniform(min_delay, max_delay) + random.uniform(-0.3, 0.8)
-                await asyncio.sleep(max(0.5, delay))
-            
+                await asyncio.sleep(random.uniform(min_delay, max_delay))
             except FloodWaitError as e:
-                wait = e.seconds
-                print(
-                    f" [{Fore.RED}!{Fore.RESET}] "
-                    f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-                    f"Flood {wait}s"
-                )
-                if wait > 180:
-                    break
-                await asyncio.sleep(min(wait + random.uniform(2, 5), 120))
-            
-            except (ChannelPrivateError, PeerIdInvalidError):
-                print(
-                    f" [{Fore.RED}✗{Fore.RESET}] "
-                    f"Ac{Fore.YELLOW}{account_num}{Fore.RESET}: "
-                    f"Target inaccessible — stopped"
-                )
-                break
-            
-            except Exception as e:
-                err = str(e)
-                if "FLOOD_WAIT" in err:
-                    m = re.search(r"(\d+)", err)
-                    w = int(m.group(1)) if m else 60
-                    await asyncio.sleep(min(w + random.uniform(2, 5), 90))
-                else:
-                    failed += 1
-                    print(
-                        f" [{Fore.RED}✗{Fore.RESET}] "
-                        f"Ac{Fore.YELLOW}{account_num}{Fore.RESET} "
-                        f"#{i}/{report_count} — {err[:70]}"
-                    )
-                    await asyncio.sleep(random.uniform(2.0, 4.0))
+                await asyncio.sleep(min(e.seconds + 2, 60))
+            except Exception:
+                failed += 1
+                await asyncio.sleep(2)
         
-        color = Fore.GREEN if success > 0 else Fore.RED
-        print(
-            f" [{Fore.CYAN}■{Fore.RESET}] "
-            f"Ac{Fore.YELLOW}{account_num}{Fore.RESET} "
-            f"({user_name}): "
-            f"{color}{success}/{report_count}{Fore.RESET} "
-            f"ok | {Fore.RED}{failed}{Fore.RESET} fail"
-        )
-        results.append({
-            "account": account_num, "name": user_name,
-            "success": success, "total": report_count, "failed": failed,
-        })
-    
+        results.append({"account": account_num, "success": success, "total": report_count, "failed": failed})
     finally:
         await client.disconnect()
 
 
 async def orchestrate(target: str, reason_name: str, report_count: int):
-    """Run all accounts against target."""
     session_files = get_valid_session_files()
-    if not session_files:
-        print(f" [{Fore.RED}!{Fore.RESET}] No accounts. Add one: python3 {argv[0]} -an +1234567890")
-        return
+    if not session_files: return
     
     reason_class = REASON_MAP.get(reason_name)
-    if not reason_class:
-        print(f" [{Fore.RED}!{Fore.RESET}] Invalid reason: {reason_name}")
-        return
-    
     ac = len(session_files)
-    total = ac * report_count
     
-    print(f"\n {Fore.CYAN}═══════════════════════════════════════{Fore.RESET}")
-    print(f" {Fore.CYAN}  TARGET:{Fore.RESET}   @{Fore.LIGHTMAGENTA_EX}{target}{Fore.RESET}")
-    print(f" {Fore.CYAN}  REASON:{Fore.RESET}   {Fore.YELLOW}{reason_name}{Fore.RESET}")
-    print(f" {Fore.CYAN}  ACCOUNTS:{Fore.RESET} {Fore.GREEN}{ac}{Fore.RESET}")
-    print(f" {Fore.CYAN}  PER ACC:{Fore.RESET}  {Fore.LIGHTBLUE_EX}{report_count}{Fore.RESET}")
-    print(f" {Fore.CYAN}  TOTAL:{Fore.RESET}    {Fore.LIGHTRED_EX}{total}{Fore.RESET}")
-    print(f" {Fore.CYAN}  START:{Fore.RESET}    {datetime.now().strftime('%H:%M:%S')}")
-    print(f" {Fore.CYAN}═══════════════════════════════════════{Fore.RESET}\n")
-    
+    print(f"\n {Fore.CYAN}══════ RUNNING ATTACK ══════{Fore.RESET}")
     results = []
     tasks = []
     
     for idx, sf in enumerate(session_files, 1):
         tasks.append(report_worker(f"sessions/{sf}", idx, target, reason_class, report_count, results))
-        await asyncio.sleep(random.uniform(1.5, 3.5))
+        await asyncio.sleep(random.uniform(1.0, 2.5))
     
     await asyncio.gather(*tasks, return_exceptions=True)
     
-    # ── Stats ──
-    print(f"\n {Fore.GREEN}═══════════════════════════════════════{Fore.RESET}")
-    print(f" {Fore.GREEN}  🏁 COMPLETE{Fore.RESET}")
-    print(f" {Fore.GREEN}═══════════════════════════════════════{Fore.RESET}")
-    
     s = sum(r.get("success", 0) for r in results)
-    f = sum(r.get("failed", 0) for r in results)
-    t = sum(r.get("total", 0) for r in results)
+    print(f"\n {Fore.GREEN}Total Successful Reports: {s}{Fore.RESET}")
+
+
+async def verify_and_confirm(target: str):
+    """Fetch target details and ask for user confirmation."""
+    session_files = get_valid_session_files()
+    if not session_files:
+        print(f" [{Fore.RED}!{Fore.RESET}] No sessions found to verify target.")
+        return False
+
+    client = TelegramClient(f"sessions/{session_files[0]}", API_ID, API_HASH)
+    await client.connect()
     
-    print(f" {Fore.CYAN}  Target:{Fore.RESET}     @{target}")
-    print(f" {Fore.CYAN}  Reason:{Fore.RESET}     {reason_name}")
-    print(f" {Fore.CYAN}  Finished:{Fore.RESET}   {datetime.now().strftime('%H:%M:%S')}")
-    print(f"  ─────────────────────────────")
-    print(f" {Fore.GREEN}  ✅ Sent:{Fore.RESET}       {Fore.LIGHTGREEN_EX}{s}{Fore.RESET}")
-    print(f" {Fore.RED}  ❌ Failed:{Fore.RESET}     {Fore.LIGHTRED_EX}{f}{Fore.RESET}")
-    
-    if t > 0:
-        pct = (s / t) * 100
-        bar = "█" * int(25 * pct / 100) + "░" * (25 - int(25 * pct / 100))
-        print(f" {Fore.CYAN}  Rate:{Fore.RESET}        [{bar}] {pct:.1f}%")
-    
-    print(f" {Fore.GREEN}═══════════════════════════════════════{Fore.RESET}\n")
+    try:
+        print(f" [{Fore.CYAN}ℹ{Fore.RESET}] Fetching target info...")
+        entity = await client.get_entity(target)
+        
+        # Determine Type and Name
+        if isinstance(entity, types.User):
+            t_type = "User"
+            t_name = f"{entity.first_name or ''} {entity.last_name or ''}".strip()
+            if entity.bot: t_type = "Bot"
+        elif isinstance(entity, types.Channel):
+            t_type = "Channel/Group"
+            t_name = entity.title
+        else:
+            t_type = "Unknown"
+            t_name = "N/A"
+
+        print(f"\n{Fore.WHITE}┌─── {Fore.YELLOW}TARGET DETAILS {Fore.WHITE}────")
+        print(f"{Fore.WHITE}│ {Fore.CYAN}Name:     {Fore.WHITE}{t_name}")
+        print(f"{Fore.WHITE}│ {Fore.CYAN}ID:       {Fore.WHITE}{entity.id}")
+        print(f"{Fore.WHITE}│ {Fore.CYAN}Username: {Fore.WHITE}@{getattr(entity, 'username', 'None')}")
+        print(f"{Fore.WHITE}│ {Fore.CYAN}Type:     {Fore.WHITE}{t_type}")
+        print(f"{Fore.WHITE}└───────────────────────────────")
+        
+        choice = input(f"\nConfirm target? (y/n): ").lower()
+        return choice == 'y'
+        
+    except Exception as e:
+        print(f" [{Fore.RED}✗{Fore.RESET}] Error resolving target: {e}")
+        return False
+    finally:
+        await client.disconnect()
 
 
 def run_multi_reason(target: str, report_count: int, reasons: list):
-    """Run all reasons cyclically."""
     async def worker():
         for rn in reasons:
-            print(f"\n {Fore.YELLOW}═══ ROUND: {rn.upper()} ═══{Fore.RESET}")
             await orchestrate(target, rn, report_count)
-            await asyncio.sleep(random.uniform(3.0, 7.0))
+            await asyncio.sleep(5)
     asyncio.run(worker())
 
 
@@ -566,55 +363,8 @@ def run_multi_reason(target: str, report_count: int, reasons: list):
 #  CLI
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def show_help():
-    print(f"""
-{Fore.CYAN}NOBITA v{VERSION} — Help{Fore.RESET}
-{Fore.WHITE}──────────────────────────────────────────────{Fore.RESET}
-
-{Fore.YELLOW}ADD ACCOUNT:{Fore.RESET}
-  python3 {argv[0]} {Fore.LIGHTBLUE_EX}-an +1234567890{Fore.RESET}
-
-{Fore.YELLOW}REPORT:{Fore.RESET}
-  python3 {argv[0]} {Fore.LIGHTBLUE_EX}-r 500 -t user -m spam{Fore.RESET}
-
-{Fore.YELLOW}ARGS:{Fore.RESET}
-  {Fore.GREEN}-an{Fore.RESET}   Add phone number
-  {Fore.GREEN}-r{Fore.RESET}    Reports per account
-  {Fore.GREEN}-t{Fore.RESET}    Target username
-  {Fore.GREEN}-m{Fore.RESET}    Reason: spam, fake_account, violence, child_abuse,
-             pornography, geoirrelevant, illegal_drugs, other,
-             personal_details, all
-  {Fore.GREEN}-re{Fore.RESET}   List reasons
-  {Fore.GREEN}-h{Fore.RESET}    This help
-
-{Fore.YELLOW}EXAMPLES:{Fore.RESET}
-  python3 {argv[0]} -an +911234567890
-  python3 {argv[0]} -r 1000 -t badchannel -m spam
-  python3 {argv[0]} -r 500 -t target -m all
-{Fore.RESET}""")
-
-
-def show_reasons():
-    print(f"""
-{Fore.CYAN}NOBITA — Report Reasons{Fore.RESET}
-{Fore.WHITE}───────────────────────────────{Fore.RESET}
-  spam             → Spam
-  fake_account     → Fake / impersonation
-  violence         → Violence / threats
-  child_abuse      → Child safety
-  pornography      → Explicit content
-  geoirrelevant    → Geo irrelevant
-  illegal_drugs    → Drugs
-  other            → Other violations
-  personal_details → Doxxing / private info
-{Fore.RESET}""")
-
-
 def main():
-    parser = argparse.ArgumentParser(
-        description=f"NOBITA Telegram Mass Report Engine v{VERSION}",
-        add_help=False,
-    )
+    parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-an", "--add-number")
     parser.add_argument("-r", "--run", type=int)
     parser.add_argument("-t", "--target", type=str)
@@ -623,53 +373,30 @@ def main():
     parser.add_argument("-h", "--help", action="store_true")
     
     args = parser.parse_args()
-    
     print(BANNER)
-    
-    if args.help:
-        show_help()
-        return
-    
-    if args.reasons:
-        show_reasons()
-        return
     
     if args.add_number:
         phone = args.add_number
         num = get_next_account_number()
-        session = f"sessions/Ac{num}"
-        client = TelegramClient(session, API_ID, API_HASH)
-        try:
-            print(f" [{Fore.CYAN}ℹ{Fore.RESET}] Adding Ac{num}...")
-            print(f" [{Fore.YELLOW}⚠{Fore.RESET}] Check phone for OTP")
-            client.start(phone=phone)
-            print(f" [{Fore.GREEN}✓{Fore.RESET}] Ac{num} added!")
-        except PhoneNumberInvalidError:
-            print(f" [{Fore.RED}!{Fore.RESET}] Invalid number. Use: +[code][number]")
-        except Exception as e:
-            print(f" [{Fore.RED}!{Fore.RESET}] {e}")
+        client = TelegramClient(f"sessions/Ac{num}", API_ID, API_HASH)
+        client.start(phone=phone)
         return
-    
+
     if args.run and args.target and args.mode:
         target = args.target.lstrip("@")
-        count = args.run
-        if args.mode == "all":
-            all_r = list(REASON_MAP.keys())
-            print(f" [{Fore.MAGENTA}⚡{Fore.RESET}] ALL {len(all_r)} reasons × {count} each")
-            run_multi_reason(target, count, all_r)
-        else:
-            asyncio.run(orchestrate(target, args.mode, count))
-        return
-    
-    print(f" Use --help for commands | {Fore.MAGENTA}t.me/Mr3rf1{Fore.RESET}")
+        
+        # NEW VERIFICATION FEATURE
+        if not asyncio.run(verify_and_confirm(target)):
+            print(f" [{Fore.RED}✗{Fore.RESET}] Aborted.")
+            return
 
+        if args.mode == "all":
+            run_multi_reason(target, args.run, list(REASON_MAP.keys()))
+        else:
+            asyncio.run(orchestrate(target, args.mode, args.run))
+        return
+
+    print(" Use -h for help.")
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print(f"\n [{Fore.YELLOW}⚠{Fore.RESET}] Interrupted")
-        sys.exit(0)
-    except Exception as e:
-        print(f"\n [{Fore.RED}!{Fore.RESET}] Fatal: {e}")
-        sys.exit(1)
+    main()
